@@ -1,0 +1,12 @@
+# Logs and crash dumps
+*.log
+*.dmp
+*.bak
+*.tmp
+*.dxvk-cache
+*.bin
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
