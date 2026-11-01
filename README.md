@@ -1,124 +1,154 @@
 # Alien: Isolation — DXVK (Vulkan) + Alias Isolation (TAA) Seamless Integration
 
-Guía y paquete de integración para hacer funcionar **[Alias Isolation](https://github.com/aliasIsolation/aliasIsolation)** (Temporal Anti-Aliasing) junto a **[DXVK](https://github.com/doitsujin/dxvk)** (Direct3D 11 a Vulkan) en **Windows**, con *frame pacing* completamente plano y sin bloqueos de FPS.
+**English** · [Español](README.es.md)
+
+A ready-to-use package and guide for running **[Alias Isolation](https://github.com/aliasIsolation/aliasIsolation)** (Temporal Anti-Aliasing) together with **[DXVK](https://github.com/doitsujin/dxvk)** (Direct3D 11 → Vulkan) on **Windows**, with flat frame pacing and no FPS lock.
 
 ---
 
-## Problemas que resuelve este proyecto
+## Included components
 
-1. **Conflicto de archivos DLL (`d3d11.dll`):**
-   Tanto Alias Isolation (vía Ultimate ASI Loader) como DXVK utilizan una librería llamada `d3d11.dll` en la raíz del juego (`AI.exe`). Al intentar usar ambos, uno sobreescribe al otro.
-2. **Arquitectura de 32 bits (`x86`):**
-   *Alien: Isolation* es un juego de 32 bits. Si se colocan las DLLs de DXVK de 64 bits (`x64`), el juego arroja el error `0xc000007b` y no inicia.
-3. **El bloqueo a 90 FPS (Half-Refresh Rate Lock en monitores de 144Hz/180Hz):**
-   Con V-Sync activo, cuando el motor no sostiene el refresco máximo por la carga del TAA, el juego divide la tasa de refresco a la mitad exacta ($180 \div 2 = 90\text{ FPS}$), provocando un patrón en "dientes de sierra" que va de 3.7 ms a más de 30 ms.
-4. **Microtirones del limitador interno de DXVK:**
-   El limitador por software integrado de DXVK en Windows genera fluctuaciones en los tiempos de cuadro (*frametimes*).
+| File | Component | Version |
+| :--- | :--- | :--- |
+| `d3d11.dll` | [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader) (Win32) | 7.7.0 |
+| `aliasIsolation.asi` + `mods/aliasIsolation/` | [Alias Isolation](https://github.com/aliasIsolation/aliasIsolation) | 1.2.0 |
+| `d3d11Hooked.dll` | DXVK `d3d11.dll`, **x86 (32-bit)**, renamed | 3.1.1 |
+| `dxgi.dll` | DXVK `dxgi.dll`, **x86 (32-bit)** | 3.1.1 |
+| `dxvk.conf` | Tuned DXVK configuration | — |
 
----
-
-## Arquitectura y funcionamiento (DLL Chaining)
-
-Se utiliza el mecanismo de encadenamiento nativo de **Ultimate ASI Loader**:
-* `d3d11.dll` (1.69 MB): Cargador ASI de Alias Isolation. Inyecta `aliasIsolation.asi`.
-* `d3d11Hooked.dll` (8.19 MB): Librería `d3d11.dll` de **DXVK (x32)** renombrada. El cargador la detecta automáticamente por el sufijo `Hooked` y le delega la tubería gráfica hacia Vulkan.
-* `dxgi.dll` (5.87 MB): Componente DXGI de **DXVK (x32)**.
-* `dxvk.conf`: Archivo de configuración optimizado para desactivar el V-Sync restrictivo y optimizar buffers dinámicos.
+SHA-256 checksums of every file are listed in [`SHA256SUMS.txt`](SHA256SUMS.txt).
 
 ---
 
-## Instalación
+## Problems this project solves
 
-### Método 1: Automático (Recomendado)
-1. Descarga el archivo **`Alien-Isolation-DXVK-AliasIsolation-v1.0.0.zip`** desde la sección de [Releases](../../releases).
-2. Descomprímelo y ejecuta **`install.bat`**. Detectará tu instalación de Steam y copiará todos los archivos necesarios.
+1. **DLL name clash (`d3d11.dll`):** Alias Isolation (through Ultimate ASI Loader) and DXVK both need a `d3d11.dll` next to `AI.exe`, so installing one overwrites the other.
+2. **32-bit architecture:** *Alien: Isolation* is a 32-bit game. The x64 DXVK DLLs make it fail with error `0xc000007b`.
+3. **Half-refresh lock (e.g. 90 FPS on a 180 Hz monitor):** with V-Sync on, whenever the engine can't hold the full refresh rate under the TAA load, it drops to exactly half ($180 \div 2 = 90$ FPS). Frametimes then swing in a saw-tooth pattern between 3.7 ms and more than 30 ms.
+4. **Stutter from DXVK's internal limiter:** DXVK's software frame limiter on Windows adds frametime jitter.
 
-### Método 2: Manual
-Copia los archivos de la carpeta `files/` a la raíz de tu juego (donde se encuentra `AI.exe`, por defecto en `C:\Program Files (x86)\Steam\steamapps\common\Alien Isolation`):
+---
+
+## How it works (DLL chaining)
+
+The package relies on Ultimate ASI Loader's chain-loading:
+
+* `d3d11.dll`: Ultimate ASI Loader. It loads `aliasIsolation.asi`.
+* `d3d11Hooked.dll`: the DXVK x86 `d3d11.dll`, renamed. The loader picks it up through the `Hooked` suffix and forwards Direct3D 11 to it, which translates to Vulkan.
+* `dxgi.dll`: the DXVK x86 DXGI component.
+* `dxvk.conf`: disables forced V-Sync and DXVK's limiter and tunes dynamic buffers.
+
+---
+
+## Installation
+
+### Option 1: Automatic (recommended)
+1. Download the latest ZIP from [Releases](../../releases).
+2. **Extract the whole ZIP**, then run **`install.bat`**.
+
+The installer:
+* finds the game in **every Steam library** (not only `C:\`), in **Epic Games Store** and in **GOG**. You can also pass a path: `install.bat "D:\Games\Alien Isolation"`.
+* **backs up** any file it replaces into `_backup_dxvk_aliasisolation\` inside the game folder.
+* moves an old `winmm.dll` ASI Loader (from a previous Alias Isolation install) to the backup, and leaves any other `winmm.dll` untouched.
+* checks every copied file against its hash and reports a clear error if something fails.
+
+> [!NOTE]
+> The **Microsoft Store / Game Pass** version is not supported: its game folder is write-protected.
+
+### Option 2: Manual
+Copy the contents of `files/` into the game folder, next to `AI.exe` (by default `C:\Program Files (x86)\Steam\steamapps\common\Alien Isolation`):
 ```text
 Alien Isolation/
 ├── AI.exe
 ├── aliasIsolation.asi
-├── d3d11.dll             <- Loader de Alias Isolation
-├── d3d11Hooked.dll       <- DXVK 32 bits renombrado
-├── dxgi.dll              <- DXVK 32 bits
-├── dxvk.conf             <- Configuración optimizada
+├── d3d11.dll             <- Ultimate ASI Loader
+├── d3d11Hooked.dll       <- DXVK 32-bit (renamed d3d11.dll)
+├── dxgi.dll              <- DXVK 32-bit
+├── dxvk.conf             <- Tuned configuration
 └── mods/
-    └── aliasIsolation/   <- Shaders del mod
+    └── aliasIsolation/   <- Mod shaders
 ```
 
+### Uninstall
+Run **`uninstall.bat`** from the package (or pass the path: `uninstall.bat "D:\Games\Alien Isolation"`). It removes the mod files and restores everything from the backup.
+
 ---
 
-## Ajustes obligatorios dentro del juego
+## Required in-game settings
 
-Entra a **Opciones -> Vídeo** en *Alien: Isolation* y configura:
+Go to **Options → Video** and set:
 
-| Ajuste | Valor requerido | Motivo |
+| Setting | Value | Why |
 | :--- | :--- | :--- |
-| **Anti-Aliasing** | **SMAA T1x** | Obligatorio para que Alias Isolation intercepte e inyecte el TAA |
-| **Aberración cromática** | **Desactivado** | El mod procesa su propia aberración cromática configurable |
-| **Desenfoque de movimiento** | **Activado** | Necesario para la generación de vectores temporales |
-| **Sincronización vertical (V-Sync)** | **Desactivado** | Evita el bloqueo del divisor a 90 FPS |
+| **Anti-Aliasing** | **SMAA T1x** | Required: Alias Isolation replaces this mode with its TAA |
+| **Chromatic Aberration** | **Off** | The mod applies its own, configurable chromatic aberration |
+| **Motion Blur** | **On** | Needed for the motion vectors the TAA uses |
+| **V-Sync** | **Off** | Avoids the half-refresh lock |
 
 > [!NOTE]
-> Durante la partida, pulsa la tecla **`Supr` (`Delete`)** para abrir el menú en pantalla de Alias Isolation y ajustar nitidez o aberración cromática.
+> In-game, press **`Delete`** to open the Alias Isolation overlay and adjust sharpening or chromatic aberration.
 
 ---
 
-## Monitorización y gráfica de rendimiento (HUD)
+## Performance HUD
 
-El archivo **`dxvk.conf`** incluye la posibilidad de monitorizar en tiempo real los FPS y la línea de estabilidad de fotogramas (*frametime graph*).
+`dxvk.conf` has a commented-out HUD line at the end. Remove the leading `#` to show FPS and the frametime graph:
+```ini
+dxvk.hud = fps,frametimes
+```
+* **Flat line:** perfect frame pacing.
+* **Spikes or saw-tooth:** stutter or lost sync.
 
-1. Abre `dxvk.conf` con un editor de texto.
-2. Añade o descomenta la siguiente línea al final:
-   ```ini
-   dxvk.hud = fps,frametimes
-   ```
-3. Inicia el juego. Aparecerá el contador en la esquina superior izquierda:
-   * **Línea plana y recta:** *Frame pacing* perfecto (máxima fluidez visual).
-   * **Picos o dientes de sierra:** Indican tirones o pérdidas de sincronización.
-4. Para quitarlo una vez comprobado, simplemente borra esa línea o déjala comentada:
-   ```ini
-   # dxvk.hud = fps,frametimes
-   ```
+Put the `#` back to hide it again.
 
 ---
 
-## Recomendación fundamental: Limitar a 120 FPS con RivaTuner (RTSS) o Radeon Chill
+## Strongly recommended: cap at 120 FPS
 
-*Alien: Isolation* fue desarrollado sobre el motor **Cathode**. En este motor, la simulación física, las animaciones de puertas, la interpolación de la cámara y los activadores de sonido están fuertemente ligados a la tasa de fotogramas:
+*Alien: Isolation* runs on the **Cathode** engine. Physics, door animations, camera interpolation and audio triggers are tied to the frame rate.
 
 > [!IMPORTANT]
-> **Superar los 120–144 FPS puede provocar fallos en el motor:**
-> * Comportamiento errático del Xenomorfo y fallos en las animaciones de muerte.
-> * Desincronización de sonido (pasos que no se escuchan o audios cortados).
-> * Puertas o tranvías que sufren *softlock* o tardan en abrirse.
-> * Sensación de *judder* (cámara a tirones) al girar la vista.
+> Players report problems **above roughly 120–144 FPS**, such as erratic Xenomorph behaviour, missing or cut audio, doors or trams that hang, and camera judder.
 
-### Configuración del límite a 120 FPS
-Se recomienda no utilizar el limitador interno de DXVK en Windows, ya que emplea temporizadores de software (`sleep`) que provocan irregularidades en la entrega de cuadros. Utiliza un limitador externo a nivel de hardware o controlador:
+Don't use DXVK's internal limiter on Windows: it is sleep-based and adds frametime jitter. Use a driver-level or RTSS limiter instead:
 
-#### Opción A: Con RivaTuner Statistics Server (RTSS)
-1. Abre **RTSS**.
-2. Añade `AI.exe` (o usa el perfil global).
-3. Establece **Framerate limit** en **`120`**.
-
-#### Opción B: Con AMD Software: Adrenalin Edition (AMD Radeon)
-1. Abre el panel de AMD (`Alt + R`).
-2. Ve a **Juegos -> Alien: Isolation**.
-3. Activa **Radeon Chill** y establece:
-   * *FPS mínimos:* **120**
-   * *FPS máximos:* **120**
-
-#### Opción C: Con el Panel de Control de NVIDIA
-1. Abre el **Panel de Control de NVIDIA**.
-2. Ve a **Controlar la configuración 3D -> Configuración de programa -> Alien: Isolation**.
-3. Busca **Velocidad máxima de fotogramas** y ajústala a **`120 FPS`**.
+* **RivaTuner Statistics Server (RTSS):** add `AI.exe` (or use the global profile) and set **Framerate limit** to **120**.
+* **AMD Adrenalin:** `Alt + R` → **Gaming → Alien: Isolation** → enable **Radeon Chill** with min = max = **120**.
+* **NVIDIA Control Panel:** **Manage 3D settings → Program settings → Alien: Isolation** → **Max Frame Rate = 120**.
 
 ---
 
-## Créditos y Licencias
+## Troubleshooting
 
-* **[Alias Isolation](https://github.com/aliasIsolation/aliasIsolation)** — Desarrollado por el equipo de Alias Isolation (Licencia MIT).
-* **[DXVK](https://github.com/doitsujin/dxvk)** — Desarrollado por doitsujin y colaboradores (Licencia zlib/libpng).
-* **[Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader)** — Desarrollado por ThirteenAG (Licencia MIT).
+| Symptom | Fix |
+| :--- | :--- |
+| Error `0xc000007b` at launch | x64 DXVK DLLs were used. Reinstall from this package, which ships x86 DLLs. |
+| No TAA effect / `Delete` doesn't open the overlay | Anti-Aliasing isn't set to **SMAA T1x**, or another `winmm.dll` / `dinput8.dll` ASI loader is loading a second copy of the mod. |
+| Black screen or crash at launch | Update your GPU driver (Vulkan support is required). Turn off other overlays (Discord, MSI Afterburner) to test. Check `AI_d3d11.log` and `AI_dxgi.log` in the game folder. |
+| ReShade / Special K stopped working | They also use `d3d11.dll` / `dxgi.dll`. The installer backed them up in `_backup_dxvk_aliasisolation\`. |
+| Stutter during the first minutes | DXVK compiles Vulkan pipelines on first use. This settles after playing for a while. |
+
+### Notes on HDR
+The game has no HDR output, so DXVK's `dxgi.enableHDR` does nothing here. Windows **Auto HDR** only works with native DX11/DX12, so it is not available while DXVK is in use. If you want HDR, look at driver-level options such as NVIDIA RTX HDR.
+
+---
+
+## Steam Deck / Linux (experimental, untested)
+
+Proton already uses DXVK, so only the Alias Isolation part is needed:
+1. Copy **only** `d3d11.dll`, `aliasIsolation.asi` and the `mods/` folder into the game folder. Do **not** copy `d3d11Hooked.dll` or `dxgi.dll`.
+2. In Steam → game **Properties → Launch Options**, set:
+   ```
+   WINEDLLOVERRIDES="d3d11=n,b" %command%
+   ```
+The loader should then chain to Proton's own DXVK. Feedback on whether this works is welcome in [Issues](../../issues).
+
+---
+
+## Credits and licenses
+
+* **[Alias Isolation](https://github.com/aliasIsolation/aliasIsolation)** — Alias Isolation team (The Unlicense).
+* **[DXVK](https://github.com/doitsujin/dxvk)** — Philip Rebohle (doitsujin) and contributors (zlib/libpng License).
+* **[Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader)** — ThirteenAG (MIT License).
+
+The full license texts are in the [`licenses/`](licenses) folder.
