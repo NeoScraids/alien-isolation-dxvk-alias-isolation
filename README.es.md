@@ -10,7 +10,7 @@ Guía y paquete de integración para hacer funcionar **[Alias Isolation](https:/
 
 | Archivo | Componente | Versión |
 | :--- | :--- | :--- |
-| `d3d11.dll` | [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader) (Win32) | 7.7.0 |
+| `d3d11.dll` | [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader) (Win32, `dinput8.dll` renombrado) | 9.7.4 |
 | `aliasIsolation.asi` + `mods/aliasIsolation/` | [Alias Isolation](https://github.com/aliasIsolation/aliasIsolation) | 1.2.0 |
 | `d3d11Hooked.dll` | `d3d11.dll` de DXVK, **x86 (32 bits)**, renombrado | 3.1.1 |
 | `dxgi.dll` | `dxgi.dll` de DXVK, **x86 (32 bits)** | 3.1.1 |
@@ -36,7 +36,7 @@ El paquete usa la carga encadenada de Ultimate ASI Loader:
 * `d3d11.dll`: Ultimate ASI Loader. Carga `aliasIsolation.asi`.
 * `d3d11Hooked.dll`: la `d3d11.dll` x86 de DXVK, renombrada. El loader la detecta por el sufijo `Hooked` y le delega Direct3D 11, que DXVK traduce a Vulkan.
 * `dxgi.dll`: el componente DXGI x86 de DXVK.
-* `dxvk.conf`: desactiva el V-Sync forzado y el limitador de DXVK, y optimiza los buffers dinámicos.
+* `dxvk.conf`: fuerza el V-Sync desactivado, desactiva el limitador de DXVK y acorta la cola de renderizado.
 
 ---
 
@@ -110,11 +110,27 @@ Vuelve a poner la `#` para ocultarlo.
 > [!IMPORTANT]
 > Los jugadores informan de problemas **por encima de unos 120–144 FPS**, como comportamiento errático del Xenomorfo, sonidos que no se oyen o se cortan, puertas o tranvías que se quedan bloqueados y *judder* de cámara.
 
-No uses el limitador interno de DXVK en Windows: se basa en `sleep` y genera irregularidades en los *frametimes*. Usa un limitador del controlador o RTSS:
+Usa un limitador del controlador o RTSS en lugar del integrado en DXVK (`dxgi.maxFrameRate = 120`). En nuestras mediciones (más abajo), el limitador de DXVK tuvo unas 10 veces más variación entre fotogramas que Radeon Chill:
 
 * **RivaTuner Statistics Server (RTSS):** añade `AI.exe` (o usa el perfil global) y pon **Framerate limit** en **120**.
 * **AMD Adrenalin:** `Alt + R` → **Juegos → Alien: Isolation** → activa **Radeon Chill** con mínimo = máximo = **120**.
 * **Panel de Control de NVIDIA:** **Controlar la configuración 3D → Configuración de programa → Alien: Isolation** → **Velocidad máxima de fotogramas = 120**.
+
+Con el V-Sync desactivado, usa un monitor **FreeSync / G-Sync**. Un límite de 120 FPS queda dentro de su rango, así que no hay tearing.
+
+### Resultados medidos
+Capturados con [PresentMon](https://github.com/GameTechDev/PresentMon) 2.6.0 durante 60 s en la misma escena, sin moverse. Equipo de prueba: RX 9070 XT, 2560×1440 a 180 Hz, límite de 120 FPS. La "variación entre fotogramas" es el cambio medio entre *frametimes* consecutivos, que es lo que se percibe como tirones.
+
+| Configuración | Variación entre fotogramas | 1% low | 0,1% low | Peor fotograma |
+| :--- | :--- | :--- | :--- | :--- |
+| `dxvk.conf` anterior (con `cachedDynamicResources = a`) + Radeon Chill | 0,048 ms | 118,1 | 116,7 | 8,81 ms |
+| `dxvk.conf` actual + Radeon Chill | 0,058 ms | 117,8 | 117,0 | 8,72 ms |
+| `dxvk.conf` actual + limitador de DXVK (`dxgi.maxFrameRate = 120`) | 0,587 ms | 105,1 | 99,7 | 11,22 ms |
+| **`dxvk.conf` actual + Radeon Chill + ASI Loader 9.7.4 (incluido)** | **0,061 ms** | **117,7** | **116,8** | **8,89 ms** |
+
+* Se ha quitado `d3d11.cachedDynamicResources = a`. No supuso ninguna diferencia medible, y DXVK documenta que puede reducir el rendimiento cuando la GPU es el cuello de botella.
+* Actualizar ASI Loader de 7.7.0 a 9.7.4 no cambia el rendimiento. El loader solo actúa al arrancar.
+* RTSS no se probó en esta ronda.
 
 ---
 
@@ -126,6 +142,7 @@ No uses el limitador interno de DXVK en Windows: se basa en `sleep` y genera irr
 | No hay TAA / `Supr` no abre el menú | El Anti-Aliasing no está en **SMAA T1x**, o hay otro ASI loader (`winmm.dll` / `dinput8.dll`) cargando una segunda copia del mod. |
 | Pantalla negra o cierre al iniciar | Actualiza el driver de la GPU (hace falta Vulkan). Desactiva otros overlays (Discord, MSI Afterburner) para probar. Revisa `AI_d3d11.log` y `AI_dxgi.log` en la carpeta del juego. |
 | ReShade / Special K dejaron de funcionar | También usan `d3d11.dll` / `dxgi.dll`. El instalador los guardó en `_backup_dxvk_aliasisolation\`. |
+| Congelón de 1–2 segundos tras Alt+Tab | Es normal: Windows saca el juego del modo Independent Flip y lo vuelve a meter. No pasa durante el juego normal. |
 | Tirones en los primeros minutos | DXVK compila las *pipelines* de Vulkan la primera vez que se usan. Desaparecen tras jugar un rato. |
 
 ### Sobre el HDR
